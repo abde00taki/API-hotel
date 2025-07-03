@@ -25,6 +25,19 @@ app.get('/products/:id', (req, res) => {
     }
 
 })
+app.delete('/products/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const index = products.findIndex(f => f.id === id);
+
+  // Vérification de l'existence
+  if (index === -1) {
+    return res.status(404).json({ error: 'apartment non trouvée.' });
+  }
+
+  // Suppression avec splice
+  const [deleted] = products.splice(index, 1);
+  res.json({ message: 'Formation supprimée.', products: deleted });
+});
 // ===============POST===========
 app.post('/product', (req, res) => {
     const { title, desc, price} = req.body;
