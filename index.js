@@ -39,12 +39,29 @@ app.delete('/products/:id', (req, res) => {
   res.json({ message: 'Formation supprimée.', products: deleted });
 });
 // ===============POST===========
-app.post('/product', (req, res) => {
-    const { title, desc, price} = req.body;
-     const id = products.length +1
-    res.json({id, title, desc, price})
-});
+app.post('/products', (req, res) => {
+  const { title, desc, image, price } = req.body;
 
+  // Vérification que tous les champs sont présents
+  if (!title || !desc || !image || !price) {
+    return res.status(400).json({ error: 'Tous les champs sont obligatoires.' });
+  }
+
+  // Création de la formation
+  const product = {
+    id: products.length+1   ,
+    title,
+    desc,
+    image,
+    price
+  };
+
+  // Ajout dans le tableau
+  products.push(product);
+
+  // Réponse avec la formation créée
+  res.status(201).json(product);
+});
 app.listen(PORT, () => {
     console.log(`PORT in my server is ${PORT}`);
     
