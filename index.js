@@ -66,3 +66,24 @@ app.listen(PORT, () => {
     console.log(`PORT in my server is ${PORT}`);
     
 })
+
+
+// ==================== PUT =============
+app.put('/products/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+  const product = products.find(f => f.id === id);
+
+  // Vérification de l'existence
+  if (!product) {
+    return res.status(404).json({ error: 'apartment non trouvée.' });
+  }
+
+  // Mise à jour des champs si fournis
+  const { title, desc, image, price } = req.body;
+  if (title) product.title = title;
+  if (desc) product.desc = desc;
+  if (image) product.image = image;
+  if (price) product.price = price;
+
+  res.json(product);
+});
