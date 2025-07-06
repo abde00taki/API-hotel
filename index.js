@@ -1,11 +1,31 @@
 const express = require('express')
 const products = require("./data/data.js")
 const cors = require('cors')
+const multer = require('multer')
+
 const app = express()
 const PORT = 8888
+
+
 app.use(express.json())
 app.use(cors())
+app.use("/uploads", express.static("uploads"));
 
+
+
+// ============== MULTER ==============
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/"); 
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + "-" + file.originalname);
+  },
+});
+
+const upload = multer({ storage: storage });
+
+// ================= GET ============
 
 app.get('/', (req, res) => {
     res.send('home page')
@@ -25,6 +45,8 @@ app.get('/products/:id', (req, res) => {
     }
 
 })
+
+// ====================== delete ================
 app.delete('/products/:id', (req, res) => {
   const id = parseInt(req.params.id);
   const index = products.findIndex(f => f.id === id);
@@ -38,52 +60,63 @@ app.delete('/products/:id', (req, res) => {
   const [deleted] = products.splice(index, 1);
   res.json({ message: 'Formation supprimée.', products: deleted });
 });
+
+
+
 // ===============POST===========
-app.post('/products', (req, res) => {
-  const { title, desc, image, price } = req.body;
+app.post('/products', upload.single('image'), (req, res) => {
+  const { title, desc, price } = req.body;
 
   // Vérification que tous les champs sont présents
-  if (!title || !desc || !image || !price) {
+  if (!title || !desc || !req.file || !price) {
     return res.status(400).json({ error: 'Tous les champs sont obligatoires.' });
   }
 
-  // Création de la formation
+  // Création du produit
   const product = {
-    id: products.length+1   ,
+    id: products.length + 1,
     title,
     desc,
-    image,
+    image: req.file.filename, 
     price
   };
 
   // Ajout dans le tableau
   products.push(product);
 
-  // Réponse avec la formation créée
+  // Réponse avec le produit créé
   res.status(201).json(product);
 });
+
+
+// ==================== PUT =============
+app.put("/products/:id", upload.single("image"), (req, res) => {
+  const id = parseInt(req.params.id);
+  const product = products.find((f) => f.id === id);
+
+  if (!product) {
+    return res.status(404).json({ error: "Apartment non trouvée." });
+  }
+
+  const { title, desc, price } = req.body;
+
+  if (title) product.title = title;
+  if (desc) product.desc = desc;
+  if (price) product.price = price;
+
+  
+  if (req.file) {
+    product.image = req.file.filename;
+  }
+
+  res.json(product);
+});
+
+
+
+// ============= run server ==============
 app.listen(PORT, () => {
     console.log(`PORT in my server is ${PORT}`);
     
 })
 
-
-// ==================== PUT =============
-app.put('/products/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const product = products.find(f => f.id === id);
-
-  // Vérification de l'existence
-  if (!product) {
-    return res.status(404).json({ error: 'apartment non trouvée.' });
-  }
-
-  // Mise à jour des champs si fournis
-  const { title, desc, image, price } = req.body;
-  if (title) product.title = title;
-  if (desc) product.desc = desc;
-  if (image) product.image = image;
-  if (price) product.price = price;
-
-  res.json(product);
-});
