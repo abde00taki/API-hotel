@@ -1,12 +1,34 @@
 const express = require('express')
-const products = require("./data/data.js")
+
 const cors = require('cors')
 const multer = require('multer')
+const mysql = require('mysql2')
 
 const app = express()
 const PORT = 8888
 
 
+// ============== database ===========
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'hotel_db'
+});
+
+db.connect((err) => {
+  if(err){
+    console.log('error connicting to db ', err  );
+    return;
+    
+  }
+  console.log('connected to mysql');
+  
+})
+
+
+
+// ===================================
 app.use(express.json())
 app.use(cors())
 app.use("/uploads", express.static("uploads"));
@@ -27,89 +49,129 @@ const upload = multer({ storage: storage });
 
 // ================= GET ============
 
-app.get('/', (req, res) => {
-    res.send('home page')
-} )
-// hada api li kayjib json men data 
 app.get('/products', (req, res) => {
-    res.json(products)
-})
+  db.query('SELECT * FROM products', (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+    res.json(results);
+  });
+});
 
 app.get('/products/:id', (req, res) => {
-    const id = parseInt(req.params.id)
-    const jjib = products.find(p => p.id === id)
-    if(jjib) {
-        res.json(jjib)
-    } else {
-        res.json({ message: ' id indefind'})
+  const id = parseInt(req.params.id);
+
+  db.query('SELECT * FROM products WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
     }
 
-})
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).json({ message: 'Product with this id not found' });
+    }
+  });
+});
+
 
 // ====================== delete ================
 app.delete('/products/:id', (req, res) => {
   const id = parseInt(req.params.id);
-  const index = products.findIndex(f => f.id === id);
 
-  // Vérification de l'existence
-  if (index === -1) {
-    return res.status(404).json({ error: 'apartment non trouvée.' });
-  }
+  db.query('DELETE FROM products WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
 
-  // Suppression avec splice
-  const [deleted] = products.splice(index, 1);
-  res.json({ message: 'Formation supprimée.', products: deleted });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Product with this id not found' });
+    }
+
+    res.json({ message: 'Product deleted successfully' });
+  });
 });
 
 
 
 // ===============POST===========
 app.post('/products', upload.single('image'), (req, res) => {
-  const { title, desc, price } = req.body;
+  const { title, desc, price, star } = req.body;
+  const image = req.file ? req.file.filename : null;
 
-  // Vérification que tous les champs sont présents
-  if (!title || !desc || !req.file || !price) {
-    return res.status(400).json({ error: 'Tous les champs sont obligatoires.' });
-  }
-
-  // Création du produit
-  const product = {
-    id: products.length + 1,
-    title,
-    desc,
-    image: req.file.filename, 
-    price
-  };
-
-  // Ajout dans le tableau
-  products.push(product);
-
-  // Réponse avec le produit créé
-  res.status(201).json(product);
+  db.query(
+    'INSERT INTO products (title, `desc`, price, image, star) VALUES (?, ?, ?, ?, ?)',
+    [title, desc, price, image, star],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'DB error' });
+      }
+      res.status(201).json({ id: result.insertId, title, desc, price, image, star });
+    }
+  );
 });
 
 
+
+
 // ==================== PUT =============
-app.put("/products/:id", upload.single("image"), (req, res) => {
+app.put('/products/:id', upload.single('image'), (req, res) => {
   const id = parseInt(req.params.id);
-  const product = products.find((f) => f.id === id);
+  const { title, desc, price, star } = req.body;
 
-  if (!product) {
-    return res.status(404).json({ error: "Apartment non trouvée." });
+  // إلا كان كاين ملف صورة
+  const image = req.file ? req.file.filename : null;
+
+  // كنوّلي نبني query بشكل dynamic
+  let fields = [];
+  let values = [];
+
+  if (title) {
+    fields.push('title = ?');
+    values.push(title);
+  }
+  if (desc) {
+    fields.push('`desc` = ?');
+    values.push(desc);
+  }
+  if (price) {
+    fields.push('price = ?');
+    values.push(price);
+  }
+  if (star) {
+    fields.push('star = ?');
+    values.push(star);
+  }
+  if (image) {
+    fields.push('image = ?');
+    values.push(image);
   }
 
-  const { title, desc, price } = req.body;
-
-  if (title) product.title = title;
-  if (desc) product.desc = desc;
-  if (price) product.price = price;
-
-  
-  if (req.file) {
-    product.image = req.file.filename;
+  // إلا ما كان حتى تغيير
+  if (fields.length === 0) {
+    return res.status(400).json({ error: 'No data provided to update' });
   }
 
-  res.json(product);
+  values.push(id); // id فالأخير
+
+  const sql = `UPDATE products SET ${fields.join(', ')} WHERE id = ?`;
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Product not found' });
+    }
+
+    res.json({ message: 'Product updated successfully' });
+  });
 });
 
 
