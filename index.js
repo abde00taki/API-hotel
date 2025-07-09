@@ -58,11 +58,90 @@ app.get('/products', (req, res) => {
     res.json(results);
   });
 });
+app.get('/contact', (req, res) => {
+  db.query('SELECT * FROM `claient` WHERE statuss = ?', ['unread'], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+    res.json(results);
+  });
+});
+app.get('/contact/readed', (req, res) => {
+  db.query('SELECT * FROM `claient` WHERE statuss = ?', ['readed'], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+    res.json(results);
+  });
+});
+
+app.get('/contact/count', (req, res) => {
+  db.query(
+    'SELECT COUNT(*) AS count FROM `claient` WHERE statuss = ?',
+    ['unread'],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'DB error' });
+      }
+      res.json({ count: results[0].count });
+    }
+  );
+});
+app.get('/contact/show', (req, res) => {
+  db.query(
+    'SELECT * FROM `claient` WHERE statuss = ?',
+    ['unread'],
+    (err, results) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'DB error' });
+      }
+
+      if (results.length > 0) {
+       
+        db.query(
+          'UPDATE `claient` SET statuss = ? WHERE statuss = ?',
+          ['readed', 'unread'],
+          (updateErr) => {
+            if (updateErr) {
+              console.error(updateErr);
+              return res.status(500).json({ error: 'DB error on update' });
+            }
+
+            res.json(results) ;
+          }
+        );
+      } else {
+        res.json([]); 
+      }
+    }
+  );
+});
+
 
 app.get('/products/:id', (req, res) => {
   const id = parseInt(req.params.id);
 
   db.query('SELECT * FROM products WHERE id = ?', [id], (err, results) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+
+    if (results.length > 0) {
+      res.json(results[0]);
+    } else {
+      res.status(404).json({ message: 'Product with this id not found' });
+    }
+  });
+});
+app.get('/contact/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  db.query('SELECT * FROM claient WHERE id = ?', [id], (err, results) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'DB error' });
@@ -94,6 +173,22 @@ app.delete('/products/:id', (req, res) => {
     res.json({ message: 'Product deleted successfully' });
   });
 });
+app.delete('/contact/:id', (req, res) => {
+  const id = parseInt(req.params.id);
+
+  db.query('DELETE FROM claient WHERE id = ?', [id], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'DB error' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'Product with this id not found' });
+    }
+
+    res.json({ message: 'Product deleted successfully' });
+  });
+});
 
 
 
@@ -101,7 +196,6 @@ app.delete('/products/:id', (req, res) => {
 app.post('/products', upload.single('image'), (req, res) => {
   const { title, desc, price, star } = req.body;
   const image = req.file ? req.file.filename : null;
-
   db.query(
     'INSERT INTO products (title, `desc`, price, image, star) VALUES (?, ?, ?, ?, ?)',
     [title, desc, price, image, star],
@@ -110,7 +204,24 @@ app.post('/products', upload.single('image'), (req, res) => {
         console.error(err);
         return res.status(500).json({ error: 'DB error' });
       }
+      
       res.status(201).json({ id: result.insertId, title, desc, price, image, star });
+    }
+  );
+});
+app.post('/contact', (req, res) => {
+  const { name, email, message } = req.body;
+  
+  db.query(
+    'INSERT INTO claient (name, email, message) VALUES (?, ?, ?)',
+    [name, email, message],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'DB error' });
+      }
+      
+      res.status(201).json({ id: result.insertId, name, email, message });
     }
   );
 });
@@ -123,10 +234,10 @@ app.put('/products/:id', upload.single('image'), (req, res) => {
   const id = parseInt(req.params.id);
   const { title, desc, price, star } = req.body;
 
-  // إلا كان كاين ملف صورة
+  
   const image = req.file ? req.file.filename : null;
 
-  // كنوّلي نبني query بشكل dynamic
+  
   let fields = [];
   let values = [];
 
@@ -151,12 +262,11 @@ app.put('/products/:id', upload.single('image'), (req, res) => {
     values.push(image);
   }
 
-  // إلا ما كان حتى تغيير
   if (fields.length === 0) {
     return res.status(400).json({ error: 'No data provided to update' });
   }
 
-  values.push(id); // id فالأخير
+  values.push(id); 
 
   const sql = `UPDATE products SET ${fields.join(', ')} WHERE id = ?`;
 
