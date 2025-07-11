@@ -50,7 +50,7 @@ const upload = multer({ storage: storage });
 // ================= GET ============
 
 app.get('/products', (req, res) => {
-  db.query('SELECT * FROM products', (err, results) => {
+  db.query('SELECT * FROM products ORDER BY star DESC ', (err, results) => {
     if (err) {
       console.error(err);
       return res.status(500).json({ error: 'DB error' });
@@ -283,6 +283,34 @@ app.put('/products/:id', upload.single('image'), (req, res) => {
     res.json({ message: 'Product updated successfully' });
   });
 });
+
+// hadi dyal apdete star 
+app.put('/products/:id/star', (req, res) => {
+  const id = parseInt(req.params.id);
+  const { star } = req.body;
+
+  if (!star || isNaN(star)) {
+    return res.status(400).json({ error: 'star is required and must be a number' });
+  }
+
+  db.query(
+    'UPDATE products SET star = ? WHERE id = ?',
+    [star, id],
+    (err, result) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({ error: 'DB error' });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: 'Product not found' });
+      }
+
+      res.json({ message: 'Star updated successfully', id, star });
+    }
+  );
+});
+
 
 
 

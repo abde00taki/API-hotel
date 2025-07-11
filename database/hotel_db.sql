@@ -20,6 +20,8 @@ SET time_zone = "+00:00";
 --
 -- Base de données : `hotel_db`
 --
+CREATE DATABASE IF NOT EXISTS hotel_db;
+USE hotel_db;
 
 -- --------------------------------------------------------
 
